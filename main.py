@@ -54,6 +54,8 @@ def draw_styled_landmarks(image,results):
                                    mp_drawing.DrawingSpec(color=(80,110,10), thickness=1, circle_radius=1),
                                     mp_drawing.DrawingSpec(color=(80,256,121), thickness=1, circle_radius=1))
 
+''' OLD WAY TO CAPTURE THE WEBCAM
+
 cap = cv2.VideoCapture(0) # Access the webcam
 with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
     while cap.isOpened():
@@ -82,6 +84,8 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
 cap.release() # Turn off the webcam
 cv2.destroyAllWindows() # Closes the window
 
+'''
+
 ############################################ EXTRACT KEYPOINT VALUES #############################################
 
 def extract_keypoints(results):
@@ -105,3 +109,56 @@ actions = np.array(['C','D','E','F','G','A','B']) #The notes that will be played
 num_sequences = 30 #Number of sequences that will be recorded (30)
 sequence_length = 30 #Number of frames that will be recorded (30 frames per sequence)
 
+for action in actions:
+    for sequence in range(num_sequences):
+        try:
+            os.makedirs(os.path.join(DATA_PATH, action, str(sequence))) #Creating the folders for each action and sequence
+        except:
+            pass
+
+############################################ COLLECT KEYPOINTS VALUES FOR TRAINING AND TESTING  #############################################
+
+cap = cv2.VideoCapture(0) # Access the webcam
+with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+    
+    #Loop through actions
+    for action in actions:
+        # Loop through sequences
+        for sequence in range(num_sequences):
+            # Loop through video length
+            for frame_num in range(sequence_length):
+
+                # Read feed
+                ret, frame = cap.read()
+
+                # Make detections
+                image, results = mediapipe_detection(frame, holistic)
+
+                # Draw landmarks
+                draw_styled_landmarks(image, results)
+
+                # Apply collection logic
+                if frame_num == 0:
+                    cv2.putText(image, 'STARTING COLLECTION', (120,200), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255, 0), 4, cv2.LINE_AA)
+                    cv2.putText(image, 'Collecting frames for {} Video Number {}'.format(action, sequence), (15,12),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+                    cv2.waitKey(2000) #Wait 2 seconds before starting the recording of sequences
+                else:
+                    cv2.putText(image, 'Collecting frames for {} Video Number {}'.format(action, sequence), (15,12),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+                    
+                # Extract keypoints
+                keypoints = extract_keypoints(results)
+                npy_path = os.path.join(DATA_PATH, action, str(sequence), str(frame_num))
+                np.save(npy_path, keypoints)
+ 
+                # Show screen
+                cv2.imshow('OpenCV Feed', image)
+
+                # Break gracefully
+                if cv2.waitKey(10) & 0xFF == ord('q'): 
+                    break
+
+    cap.release() # Turn off the webcam 
+    cv2.destroyAllWindows() # Closes the window
